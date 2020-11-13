@@ -1,5 +1,6 @@
 from tkinter import *
 import tkinter.messagebox
+import datetime
 from PIL import Image, ImageTk
 import socket, threading, sys, traceback, os
 
@@ -13,6 +14,8 @@ HEADER_REQUEST_TYPE_SETUP = "SETUP"
 HEADER_REQUEST_TYPE_PAUSE = "PAUSE"
 HEADER_REQUEST_TYPE_PLAY = "PLAY"
 HEADER_REQUEST_TYPE_TEARDOWN = "TEARDOWN"
+HEADER_REQUEST_TYPE_FORWARD = "FORWARD"
+HEADER_REQUEST_TYPE_BACKWARD = "BACKWARD"
 
 # Some request header key constants
 HEADER_FIELD_SESSION = "Session"
@@ -30,11 +33,14 @@ class Client:
     PLAY = 1
     PAUSE = 2
     TEARDOWN = 3
+    FORWARD = 4
+    BACKWARD = 5
     
-    # Initiation..
+    # Initiation.. NOT MODIFIED
     def __init__(self, master, serveraddr, serverport, rtpport, filename):
         self.master = master
         self.master.protocol("WM_DELETE_WINDOW", self.handler)
+        self.currentTime = StringVar()
         self.createWidgets()
         self.serverAddr = serveraddr
         self.serverPort = int(serverport)
@@ -46,36 +52,65 @@ class Client:
         self.teardownAcked = 0
         self.connectToServer()
         self.frameNbr = 0
+        self.setupMovie()
         
     def createWidgets(self):
         """Build GUI."""
         # Create Setup button
-        self.setup = Button(self.master, width=20, padx=3, pady=3)
-        self.setup["text"] = "Setup"
-        self.setup["command"] = self.setupMovie
-        self.setup.grid(row=1, column=0, padx=2, pady=2)
-        
-        # Create Play button        
-        self.start = Button(self.master, width=20, padx=3, pady=3)
-        self.start["text"] = "Play"
+        # self.setup = Button(self.master, width=20, padx=3, pady=3)
+        # self.setup["text"] = "Setup"
+        # self.setup["command"] = self.setupMovie
+        # self.setup.grid(row=1, column=0, padx=2, pady=2)
+        menu = Frame(self.master)
+        menu.pack(side=BOTTOM)
+        view = Frame(self.master)
+        view.pack(side=TOP)
+        # Create Play button      
+        self.start = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        playBtn = ImageTk.PhotoImage(Image.open('playbtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.start.config(image=playBtn)
+        self.start.image = playBtn
         self.start["command"] = self.playMovie
         self.start.grid(row=1, column=1, padx=2, pady=2)
         
         # Create Pause button           
-        self.pause = Button(self.master, width=20, padx=3, pady=3)
-        self.pause["text"] = "Pause"
+        self.pause = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        pauseBtn = ImageTk.PhotoImage(Image.open('pauseBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.pause.config(image=pauseBtn)
         self.pause["command"] = self.pauseMovie
+        self.pause.image = pauseBtn
         self.pause.grid(row=1, column=2, padx=2, pady=2)
         
         # Create Teardown button
-        self.teardown = Button(self.master, width=20, padx=3, pady=3)
-        self.teardown["text"] = "Teardown"
+        self.teardown = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        teardownBtn = ImageTk.PhotoImage(Image.open('teardownBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.teardown.config(image=teardownBtn)
+        self.teardown.image = teardownBtn
         self.teardown["command"] =  self.exitClient
         self.teardown.grid(row=1, column=3, padx=2, pady=2)
         
+        # Create Forward button
+        self.forward = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        forwardBtn = ImageTk.PhotoImage(Image.open('forwardBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.forward.config(image=forwardBtn)
+        self.forward.image = forwardBtn
+        self.forward["command"] =  self.forwardMovie
+        self.forward.grid(row=1, column=4, padx=2, pady=2)
+
+        # Create Backward button
+        self.backward = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        backwardBtn = ImageTk.PhotoImage(Image.open('backwardBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.backward.config(image=backwardBtn)
+        self.backward.image = backwardBtn
+        self.backward["command"] = self.backwardMovie
+        self.backward.grid(row=1, column=5, padx=2, pady=2)
+
         # Create a label to display the movie
-        self.label = Label(self.master, height=19)
-        self.label.grid(row=0, column=0, columnspan=4, sticky=W+E+N+S, padx=5, pady=5) 
+        self.label = Label(view)
+        self.label.pack()
+
+        self.clock = Label(view, textvariable=self.currentTime)
+        self.clock.pack(side=TOP)
     
     def setupMovie(self):
         """Setup button handler."""
@@ -93,6 +128,7 @@ class Client:
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.PAUSE)
     
+    # NOT MODIFY
     def playMovie(self):
         """Play button handler."""
         if self.state == self.READY:
@@ -102,6 +138,14 @@ class Client:
             self.playEvent.clear()
             self.sendRtspRequest(self.PLAY)
     
+    def forwardMovie(self):
+        if self.state == self.PLAYING:
+            self.sendRtspRequest(self.FORWARD)
+
+    def backwardMovie(self):
+        if self.state == self.PLAYING:
+            self.sendRtspRequest(self.BACKWARD)
+
     def listenRtp(self):        
         """Listen for RTP packets."""
         while True:
@@ -114,9 +158,12 @@ class Client:
                     currFrameNbr = rtpPacket.seqNum()
                     print("Current Seq Num: " + str(currFrameNbr))
                                         
-                    if currFrameNbr > self.frameNbr: # Discard the late packet
+                    if currFrameNbr > self.frameNbr or self.requestSent == self.BACKWARD: # Discard the late packet
                         self.frameNbr = currFrameNbr
                         self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
+                        self.currentTime.set(str(datetime.timedelta(seconds=self.frameNbr*0.05)))
+
+
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
                 if self.playEvent.isSet(): 
@@ -138,12 +185,14 @@ class Client:
         
         return cachename
     
+
     def updateMovie(self, imageFile):
         """Update the image file as video frame in the GUI."""
         photo = ImageTk.PhotoImage(Image.open(imageFile))
-        self.label.configure(image = photo, height=288) 
+        self.label.configure(image = photo) 
         self.label.image = photo
-        
+    
+
     def connectToServer(self):
         """Connect to the Server. Start a new RTSP/TCP session."""
         self.rtspSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -152,7 +201,6 @@ class Client:
         except:
             tkinter.messagebox.showwarning('Connection Failed', 'Connection to \'%s\' failed.' %self.serverAddr)
     
-    # create a string of request like in the text
     def newRequest(self, request_type):
         """Build an RTSP Request header """
         request = "{} {} {}\n".format(request_type, self.fileName, HEADER_FIELD_PROTOCOL)
@@ -185,6 +233,24 @@ class Client:
             # Keep track of the sent request.
             self.requestSent = self.PLAY
 
+        # Forward request
+        elif requestCode == self.FORWARD and self.state == self.PLAYING:
+            # Update RTSP sequence number.
+            self.rtspSeq += 1
+            # Write the RTSP request to be sent.
+            request = self.newRequest(HEADER_REQUEST_TYPE_FORWARD)
+            # Keep track of the sent request.
+            self.requestSent = self.FORWARD
+
+        # Backward request
+        elif requestCode == self.BACKWARD and self.state == self.PLAYING:
+            # Update RTSP sequence number.
+            self.rtspSeq += 1
+            # Write the RTSP request to be sent.
+            request = self.newRequest(HEADER_REQUEST_TYPE_BACKWARD)
+            # Keep track of the sent request.
+            self.requestSent = self.BACKWARD
+
         # Pause request
         elif requestCode == self.PAUSE and self.state == self.PLAYING:
             # Update RTSP sequence number.
@@ -210,7 +276,7 @@ class Client:
 
         # Print the data sent to the console
         print('\nData sent:\n' + request)
-    
+
     def recvRtspReply(self):
         """Receive RTSP reply from the server."""
         while True:
@@ -246,7 +312,7 @@ class Client:
 
                         # Open RTP port.
                         self.openRtpPort()
-                    elif self.requestSent == self.PLAY:
+                    elif self.requestSent == self.PLAY or self.requestSent == self.FORWARD or self.requestSent == self.BACKWARD:
                         self.state = self.PLAYING
                     elif self.requestSent == self.PAUSE:
                         self.state = self.READY

@@ -9,6 +9,8 @@ class ServerWorker:
 	PLAY = 'PLAY'
 	PAUSE = 'PAUSE'
 	TEARDOWN = 'TEARDOWN'
+	FORWARD = 'FORWARD'
+	BACKWARD = 'BACKWARD'
 	
 	INIT = 0
 	READY = 1
@@ -18,7 +20,8 @@ class ServerWorker:
 	OK_200 = 0
 	FILE_NOT_FOUND_404 = 1
 	CON_ERR_500 = 2
-	
+	forwarding = 0
+	backwarding = 0
 	clientInfo = {}
 	
 	def __init__(self, clientInfo):
@@ -83,9 +86,24 @@ class ServerWorker:
 				
 				# Create a new thread and start sending RTP packets
 				self.clientInfo['event'] = threading.Event()
+				self.clientInfo['forward'] = threading.Event()
 				self.clientInfo['worker']= threading.Thread(target=self.sendRtp) 
 				self.clientInfo['worker'].start()
 		
+		# Process FORWARD request 20 frames
+		elif requestType == self.FORWARD:
+			if self.state == self.PLAYING:
+				print("processing FORWARD\n")				
+				self.forwarding = 1			
+				self.replyRtsp(self.OK_200, seq[1])
+
+		# Process BACKWARD request 20 frames
+		elif requestType == self.BACKWARD:
+			if self.state == self.PLAYING:
+				print("processing BACKWARD\n")				
+				self.backwarding = 1			
+				self.replyRtsp(self.OK_200, seq[1])
+
 		# Process PAUSE request
 		elif requestType == self.PAUSE:
 			if self.state == self.PLAYING:
@@ -114,20 +132,28 @@ class ServerWorker:
 			
 			# Stop sending if request is PAUSE or TEARDOWN
 			if self.clientInfo['event'].isSet(): 
-				break 
-				
-			data = self.clientInfo['videoStream'].nextFrame()
-			if data: 
-				frameNumber = self.clientInfo['videoStream'].frameNbr()
-				try:
-					address = self.clientInfo['rtspSocket'][1][0]
-					port = int(self.clientInfo['rtpPort'])
-					self.clientInfo['rtpSocket'].sendto(self.makeRtp(data, frameNumber),(address,port))
-				except:
-					print("Connection Error")
-					print('-'*60)
-					traceback.print_exc(file=sys.stdout)
-					print('-'*60)
+				break
+
+			if self.forwarding: 
+				for x in range(1,20):
+					data = self.clientInfo['videoStream'].nextFrame()
+				self.forwarding = 0
+			elif self.backwarding:
+				data = self.clientInfo['videoStream'].lastFrame()
+				self.backwarding = 0
+			else:
+				data = self.clientInfo['videoStream'].nextFrame()
+				if data: 
+					frameNumber = self.clientInfo['videoStream'].frameNbr()
+					try:
+						address = self.clientInfo['rtspSocket'][1][0]
+						port = int(self.clientInfo['rtpPort'])
+						self.clientInfo['rtpSocket'].sendto(self.makeRtp(data, frameNumber),(address,port))
+					except:
+						print("Connection Error")
+						print('-'*60)
+						traceback.print_exc(file=sys.stdout)
+						print('-'*60)
 
 	def makeRtp(self, payload, frameNbr):
 		"""RTP-packetize the video data."""
