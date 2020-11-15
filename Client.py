@@ -46,6 +46,7 @@ class Client:
         self.master = master
         self.master.protocol("WM_DELETE_WINDOW", self.handler)
         self.currentTime = StringVar()
+        self.lostRate = StringVar(value="0")
         self.createWidgets()
         self.serverAddr = serveraddr
         self.serverPort = int(serverport)
@@ -59,6 +60,7 @@ class Client:
         self.frameNbr = 0
         self.setupMovie()
         self.isSwitching = 0
+        self.lostCnt = 0
         
     def createWidgets(self):
         """Build GUI."""
@@ -134,16 +136,15 @@ class Client:
 
         self.clock = Label(view, textvariable=self.currentTime)
         self.clock.pack(side=TOP)
+        self.rate = Label(view, textvariable=self.lostRate)
+        self.rate.pack(side=BOTTOM)
+        
     
-    # this function handle the click of user on SETUP button
-    # Sent the SETUP request only if the current state is INIT
     def setupMovie(self):
         """Setup button handler."""
         if self.state == self.INIT:
             self.sendRtspRequest(self.SETUP)
-    
-    # this function handle the click of user on RESET button
-    # it will reset the all attributes and reset the movie so that start another session
+        
     def resetConnect(self):
         if self.state == self.INIT:
             self.teardownAcked = 0
@@ -154,30 +155,24 @@ class Client:
             self.isSwitching = 0
             self.connectToServer()
             self.setupMovie()
+            self.playMovie()
 
-    # this function handles the click of user on close button
-    # send a teardown request and close the app
     def exitClient(self):
         """Teardown button handler."""
         self.sendRtspRequest(self.TEARDOWN)     
         self.master.destroy() # Close the gui window
         os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
 
-    # this function handles the click of user on teardown button 
-    # this funciton will send a teardown request and remove the cache file
     def teardownMovie(self):
         self.sendRtspRequest(self.TEARDOWN)     
+        # self.master.destroy() # Close the gui window
         os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
     
-    # this function handles the click of user on pause button
-    # send the pause request only if the current state is playing
     def pauseMovie(self):
         """Pause button handler."""
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.PAUSE)
     
-    # this function handles the click of user on play button
-    # if the state is ready the it will create a new thread to listen on RTP packets, reset the flag (which will stop the loop) and send a play message
     def playMovie(self):
         """Play button handler."""
         if self.state == self.READY:
@@ -187,30 +182,17 @@ class Client:
             self.playEvent.clear()
             self.sendRtspRequest(self.PLAY)
     
-    # this function handles the click of user on forward button
-    # send the forward request only if the current state is playing
     def forwardMovie(self):
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.FORWARD)
 
-    # this function handles the click of user on backward button
-    # send the backward request only if the current state is playing
     def backwardMovie(self):
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.BACKWARD)
 
-    # this function handles the click of user on switch button
-    # send the change request
     def switchMovie(self):
         self.sendRtspRequest(self.CHANGE)
 
-    # create a while loop which continue to recive the rpt packet form the server
-    # 1. Decode the packet
-    # 2. Get the sequence number of this packet if it arrived late (less than the current frame) then ignore
-    #     Get the total time by multiply the frameNum with the time that the server sent each image 0.05    
-    # 3. However if the request sent is BACKWARD then accept the packet
-    # 4. The loop will stop if the flag play event is set when user request PAUSE of TEARDOWN
-    # 5. If the flag indicates TEARDOWN has been sent then close the rtp socket
     def listenRtp(self):        
         """Listen for RTP packets."""
         while True:
@@ -224,10 +206,12 @@ class Client:
                     print("Current Seq Num: " + str(currFrameNbr))
                                         
                     if currFrameNbr > self.frameNbr or self.requestSent == self.BACKWARD: # Discard the late packet
+                        self.currentTime.set("Total time: " + str(datetime.timedelta(seconds=self.frameNbr*0.05)))
+                        if (currFrameNbr - self.frameNbr > 1):
+                            self.lostCnt = self.lostCnt + currFrameNbr - self.frameNbr - 1
                         self.frameNbr = currFrameNbr
+                        self.lostRate.set(value ="Lost rate: " + str(self.lostCnt/self.frameNbr * 100))
                         self.updateMovie(self.writeFrame(rtpPacket.getPayload()))
-                        self.currentTime.set(str(datetime.timedelta(seconds=self.frameNbr*0.05)))
-
 
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
@@ -240,9 +224,7 @@ class Client:
                     self.rtpSocket.shutdown(socket.SHUT_RDWR)
                     self.rtpSocket.close()
                     break
-    
-    # receive the payload and write it to an image file used to update to the frame
-    # create and return the fileName
+                    
     def writeFrame(self, data):
         """Write the received frame to a temp image file. Return the image file."""
         cachename = CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT
@@ -252,14 +234,14 @@ class Client:
         
         return cachename
     
-    # this function receive the image file name, and change the frame 
+
     def updateMovie(self, imageFile):
         """Update the image file as video frame in the GUI."""
         photo = ImageTk.PhotoImage(Image.open(imageFile))
         self.label.configure(image = photo) 
         self.label.image = photo
     
-    # create a socket to connect to the server to send requests
+
     def connectToServer(self):
         """Connect to the Server. Start a new RTSP/TCP session."""
         self.rtspSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -268,7 +250,6 @@ class Client:
         except:
             tkinter.messagebox.showwarning('Connection Failed', 'Connection to \'%s\' failed.' %self.serverAddr)
     
-    # generate the string contains the request with suitable format
     def newRequest(self, request_type):
         """Build an RTSP Request header """
         request = "{} {} {}\n".format(request_type, self.fileName, HEADER_FIELD_PROTOCOL)
@@ -279,10 +260,6 @@ class Client:
             request += "{}: {}".format(HEADER_FIELD_SESSION, self.sessionId)
         return request
 
-    # send the rtsp request to server through the Rtsp socket 
-    # check the requested code (which is generated when users click on buttons) and the current state
-    # increase sequence number
-    # keep track of the request has been sent
     def sendRtspRequest(self, requestCode):
         """Send RTSP request to the server."""  
 
@@ -358,13 +335,9 @@ class Client:
         # Print the data sent to the console
         print('\nData sent:\n' + request)
 
-    # create a loop to receive the reply from the server
-    # parse the reply
-    # if the request has been sent is TEARDOWN then it will close the rtsp socket and stop the loop 
     def recvRtspReply(self):
         """Receive RTSP reply from the server."""
         while True:
-            # buffer size is 1024
             reply = self.rtspSocket.recv(1024)
             
             if reply: 
@@ -376,19 +349,7 @@ class Client:
                 self.rtspSocket.close()
                 break
             
-    # this function is to parse the reply from the server
-    # 1. Separate each line of the reply
-    # 2. Get the sequence number in the second line at the second word of the reply
-    # 3. Compare with the sequence number of the request and proccess only if they are the same 
-    # 3.a. Get the session number at the third line of the reply
-    # 3.b. If the sessionId is 0 (that is the case is when the setup request and the server return a random session Id) then assign the sessionId of the client
-    # 3.c. Otherwise the sessionId of the server reply should be the same as the client:
-    # 3.c. If reply code is 200 Ok (which is at the first line and the second word)
-    # 3.c. If the request sent is SETUP: change state to READY and open rtp socket to receive the 
-    # 3.c. If the request sent is PLAY or FORWARD or BACKWARD then change state to PLAYING
-    # 3.c. If the request sent is PAUSE then change the state to READY and set the flag to stop the play listen
-    # 3.c. If the request sent is CHANGE then change the state to SWITCH and from the reply get the list of videos file and then set the fileName to the file after the playing video in the list
-    # 3.c. If the request sent is TEARDOWN then set state to INIT and raise the flag to close the rtp socket
+                
     def parseRtspReply(self, data):
         """Parse the RTSP reply from the server."""
         lines = data.split('\n')
@@ -429,13 +390,12 @@ class Client:
                                 else:
                                     self.fileName = listfile[0]
                                 break
-
+                        
                     elif self.requestSent == self.TEARDOWN:
                         self.state = self.INIT
                         # Flag the teardownAcked to close the socket.
                         self.teardownAcked = 1
 
-    # Open the RTP socket to receive the packets contains frame over UDP,
     def openRtpPort(self):
         """Open RTP socket binded to a specified port."""
         # Create a new datagram socket to receive RTP packets from the server
@@ -448,8 +408,6 @@ class Client:
         except:
             tkinter.messagebox.showwarning('Unable to Bind', 'Unable to bind PORT=%d' %self.rtpPort)
 
-    # 1. Pause the video
-    # 2. Open a box for the user to confirm
     def handler(self):
         """Handler on explicitly closing the GUI window."""
         self.pauseMovie()
