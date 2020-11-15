@@ -31,7 +31,7 @@ class Client:
     PLAYING = 2
     SWITCH = 3
     state = INIT
-    
+
     SETUP = 0
     PLAY = 1
     PAUSE = 2
@@ -61,7 +61,7 @@ class Client:
         self.setupMovie()
         self.isSwitching = 0
         self.lostCnt = 0
-        
+
     def createWidgets(self):
         """Build GUI."""
         # Create Setup button
@@ -73,34 +73,34 @@ class Client:
         self.menu.pack(side=BOTTOM)
         view = Frame(self.master)
         view.pack(side=TOP)
-        # Create Play button      
+        # Create Play button
         self.start = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        playBtn = ImageTk.PhotoImage(Image.open('playbtn.png').resize((40, 40), Image.ANTIALIAS))
+        playBtn = ImageTk.PhotoImage(Image.open('play.png').resize((40, 40), Image.ANTIALIAS))
         self.start.config(image=playBtn)
         self.start.image = playBtn
         self.start["command"] = self.playMovie
         self.start.grid(row=1, column=1, padx=2, pady=2)
-        
-        # Create Pause button           
+
+        # Create Pause button
         self.pause = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        pauseBtn = ImageTk.PhotoImage(Image.open('pauseBtn.png').resize((40, 40), Image.ANTIALIAS))
+        pauseBtn = ImageTk.PhotoImage(Image.open('pause.png').resize((40, 40), Image.ANTIALIAS))
         self.pause.config(image=pauseBtn)
         self.pause["command"] = self.pauseMovie
         self.pause.image = pauseBtn
         self.pause.grid(row=1, column=2, padx=2, pady=2)
-        
+
         # Create Teardown button
         self.teardown = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        teardownBtn = ImageTk.PhotoImage(Image.open('teardownBtn.png').resize((40, 40), Image.ANTIALIAS))
+        teardownBtn = ImageTk.PhotoImage(Image.open('teardown.png').resize((40, 40), Image.ANTIALIAS))
         self.teardown.config(image=teardownBtn)
         self.teardown.image = teardownBtn
         self.teardown["command"] =  self.teardownMovie
         self.teardown.grid(row=1, column=3, padx=2, pady=2)
-        
+
 
         # Create Backward button
         self.backward = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        backwardBtn = ImageTk.PhotoImage(Image.open('backwardBtn.png').resize((40, 40), Image.ANTIALIAS))
+        backwardBtn = ImageTk.PhotoImage(Image.open('backward.png').resize((40, 40), Image.ANTIALIAS))
         self.backward.config(image=backwardBtn)
         self.backward.image = backwardBtn
         self.backward["command"] = self.backwardMovie
@@ -108,7 +108,7 @@ class Client:
 
         # Create Forward button
         self.forward = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        forwardBtn = ImageTk.PhotoImage(Image.open('forwardBtn.png').resize((40, 40), Image.ANTIALIAS))
+        forwardBtn = ImageTk.PhotoImage(Image.open('forward.png').resize((40, 40), Image.ANTIALIAS))
         self.forward.config(image=forwardBtn)
         self.forward.image = forwardBtn
         self.forward["command"] =  self.forwardMovie
@@ -116,7 +116,7 @@ class Client:
 
         # Create Switch button
         self.switch = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        switchBtn = ImageTk.PhotoImage(Image.open('switchBtn.png').resize((40, 40), Image.ANTIALIAS))
+        switchBtn = ImageTk.PhotoImage(Image.open('switch.png').resize((40, 40), Image.ANTIALIAS))
         self.switch.config(image=switchBtn)
         self.switch.image = switchBtn
         self.switch["command"] =  self.switchMovie
@@ -124,7 +124,7 @@ class Client:
 
         # Create Reset button
         self.reset = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        resetBtn = ImageTk.PhotoImage(Image.open('resetBtn.png').resize((40, 40), Image.ANTIALIAS))
+        resetBtn = ImageTk.PhotoImage(Image.open('reset.png').resize((40, 40), Image.ANTIALIAS))
         self.reset.config(image=resetBtn)
         self.reset.image = resetBtn
         self.reset["command"] =  self.resetConnect
@@ -138,13 +138,13 @@ class Client:
         self.clock.pack(side=TOP)
         self.rate = Label(view, textvariable=self.lostRate)
         self.rate.pack(side=BOTTOM)
-        
-    
+
+
     def setupMovie(self):
         """Setup button handler."""
         if self.state == self.INIT:
             self.sendRtspRequest(self.SETUP)
-        
+
     def resetConnect(self):
         if self.state == self.INIT:
             self.teardownAcked = 0
@@ -159,20 +159,20 @@ class Client:
 
     def exitClient(self):
         """Teardown button handler."""
-        self.sendRtspRequest(self.TEARDOWN)     
+        self.sendRtspRequest(self.TEARDOWN)
         self.master.destroy() # Close the gui window
         os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
 
     def teardownMovie(self):
-        self.sendRtspRequest(self.TEARDOWN)     
+        self.sendRtspRequest(self.TEARDOWN)
         # self.master.destroy() # Close the gui window
         os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
-    
+
     def pauseMovie(self):
         """Pause button handler."""
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.PAUSE)
-    
+
     def playMovie(self):
         """Play button handler."""
         if self.state == self.READY:
@@ -181,7 +181,7 @@ class Client:
             self.playEvent = threading.Event()
             self.playEvent.clear()
             self.sendRtspRequest(self.PLAY)
-    
+
     def forwardMovie(self):
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.FORWARD)
@@ -193,7 +193,7 @@ class Client:
     def switchMovie(self):
         self.sendRtspRequest(self.CHANGE)
 
-    def listenRtp(self):        
+    def listenRtp(self):
         """Listen for RTP packets."""
         while True:
             try:
@@ -201,10 +201,10 @@ class Client:
                 if data:
                     rtpPacket = RtpPacket()
                     rtpPacket.decode(data)
-                    
+
                     currFrameNbr = rtpPacket.seqNum()
                     print("Current Seq Num: " + str(currFrameNbr))
-                                        
+
                     if currFrameNbr > self.frameNbr or self.requestSent == self.BACKWARD: # Discard the late packet
                         self.currentTime.set("Total time: " + str(datetime.timedelta(seconds=self.frameNbr*0.05)))
                         if (currFrameNbr - self.frameNbr > 1):
@@ -215,32 +215,32 @@ class Client:
 
             except:
                 # Stop listening upon requesting PAUSE or TEARDOWN
-                if self.playEvent.isSet(): 
+                if self.playEvent.isSet():
                     break
-                
+
                 # Upon receiving ACK for TEARDOWN request,
                 # close the RTP socket
                 if self.teardownAcked == 1:
                     self.rtpSocket.shutdown(socket.SHUT_RDWR)
                     self.rtpSocket.close()
                     break
-                    
+
     def writeFrame(self, data):
         """Write the received frame to a temp image file. Return the image file."""
         cachename = CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT
         file = open(cachename, "wb")
         file.write(data)
         file.close()
-        
+
         return cachename
-    
+
 
     def updateMovie(self, imageFile):
         """Update the image file as video frame in the GUI."""
         photo = ImageTk.PhotoImage(Image.open(imageFile))
-        self.label.configure(image = photo) 
+        self.label.configure(image = photo)
         self.label.image = photo
-    
+
 
     def connectToServer(self):
         """Connect to the Server. Start a new RTSP/TCP session."""
@@ -249,7 +249,7 @@ class Client:
             self.rtspSocket.connect((self.serverAddr, self.serverPort))
         except:
             tkinter.messagebox.showwarning('Connection Failed', 'Connection to \'%s\' failed.' %self.serverAddr)
-    
+
     def newRequest(self, request_type):
         """Build an RTSP Request header """
         request = "{} {} {}\n".format(request_type, self.fileName, HEADER_FIELD_PROTOCOL)
@@ -261,7 +261,7 @@ class Client:
         return request
 
     def sendRtspRequest(self, requestCode):
-        """Send RTSP request to the server."""  
+        """Send RTSP request to the server."""
 
         # Setup request
         if requestCode == self.SETUP and self.state == self.INIT:
@@ -308,7 +308,7 @@ class Client:
             request = self.newRequest(HEADER_REQUEST_TYPE_PAUSE)
             # Keep track of the sent request.
             self.requestSent = self.PAUSE
-            
+
         # Teardown request
         elif requestCode == self.TEARDOWN and not self.state == self.INIT:
             # Update RTSP sequence number.
@@ -317,7 +317,7 @@ class Client:
             request = self.newRequest(HEADER_REQUEST_TYPE_TEARDOWN)
             # Keep track of the sent request.
             self.requestSent = self.TEARDOWN
-        
+
         # Change request
         elif requestCode == self.CHANGE:
             # Update RTSP sequence number.
@@ -328,7 +328,7 @@ class Client:
             self.requestSent = self.CHANGE
         else:
             return
-        
+
         # Send the RTSP request using rtspSocket.
         self.rtspSocket.send(request.encode())
 
@@ -339,22 +339,22 @@ class Client:
         """Receive RTSP reply from the server."""
         while True:
             reply = self.rtspSocket.recv(1024)
-            
-            if reply: 
+
+            if reply:
                 self.parseRtspReply(reply.decode("utf-8"))
-                
+
             # Close the RTSP socket upon requesting Teardown
             if self.requestSent == self.TEARDOWN:
                 self.rtspSocket.shutdown(socket.SHUT_RDWR)
                 self.rtspSocket.close()
                 break
-            
-                
+
+
     def parseRtspReply(self, data):
         """Parse the RTSP reply from the server."""
         lines = data.split('\n')
         seqNum = int(lines[1].split(' ')[1])
-        
+
         # Process only if the server reply's sequence number is the same as the request's
         if seqNum == self.rtspSeq:
             session = int(lines[2].split(' ')[1])
@@ -364,7 +364,7 @@ class Client:
 
             # Process only if the session ID is the same
             if self.sessionId == session:
-                if int(lines[0].split(' ')[1]) == 200: 
+                if int(lines[0].split(' ')[1]) == 200:
                     if self.requestSent == self.SETUP:
                         # Update RTSP state.
                         self.state = self.READY
@@ -390,7 +390,7 @@ class Client:
                                 else:
                                     self.fileName = listfile[0]
                                 break
-                        
+
                     elif self.requestSent == self.TEARDOWN:
                         self.state = self.INIT
                         # Flag the teardownAcked to close the socket.
