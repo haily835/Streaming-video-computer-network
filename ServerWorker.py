@@ -1,4 +1,5 @@
 from random import randint
+import os
 import sys, traceback, threading, socket
 
 from VideoStream import VideoStream
@@ -11,10 +12,12 @@ class ServerWorker:
 	TEARDOWN = 'TEARDOWN'
 	FORWARD = 'FORWARD'
 	BACKWARD = 'BACKWARD'
+	CHANGE = 'CHANGE'
 	
 	INIT = 0
 	READY = 1
 	PLAYING = 2
+	SWITCH = 3
 	state = INIT
 
 	OK_200 = 0
@@ -114,6 +117,16 @@ class ServerWorker:
 			
 				self.replyRtsp(self.OK_200, seq[1])
 		
+		# Process CHANGE request
+		elif requestType == self.CHANGE:
+			if self.state == self.PLAYING:
+				print("processing CHANGE\n")
+				listfile = ""
+				for f_name in os.listdir('./'):
+					if f_name.endswith('.mjpeg'):
+						listfile += f_name + ' '
+				self.replyRtsp(self.OK_200, seq[1], listfile)
+			
 		# Process TEARDOWN request
 		elif requestType == self.TEARDOWN:
 			print("processing TEARDOWN\n")
@@ -124,7 +137,9 @@ class ServerWorker:
 			
 			# Close the RTP socket
 			self.clientInfo['rtpSocket'].close()
+
 			
+
 	def sendRtp(self):
 		"""Send RTP packets over UDP."""
 		while True:
@@ -172,11 +187,15 @@ class ServerWorker:
 		
 		return rtpPacket.getPacket()
 		
-	def replyRtsp(self, code, seq):
+	def replyRtsp(self, code, seq, add = ""):
 		"""Send RTSP reply to the client."""
+		reply = ""
 		if code == self.OK_200:
 			#print("200 OK")
-			reply = 'RTSP/1.0 200 OK\nCSeq: ' + seq + '\nSession: ' + str(self.clientInfo['session'])
+			if add:
+				reply = 'RTSP/1.0 200 OK\nCSeq: ' + seq + '\nSession: ' + str(self.clientInfo['session']) + '\n' + add
+			else:
+				reply = 'RTSP/1.0 200 OK\nCSeq: ' + seq + '\nSession: ' + str(self.clientInfo['session'])
 			connSocket = self.clientInfo['rtspSocket'][0]
 			connSocket.send(reply.encode())
 		

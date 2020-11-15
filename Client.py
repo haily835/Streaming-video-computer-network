@@ -16,6 +16,8 @@ HEADER_REQUEST_TYPE_PLAY = "PLAY"
 HEADER_REQUEST_TYPE_TEARDOWN = "TEARDOWN"
 HEADER_REQUEST_TYPE_FORWARD = "FORWARD"
 HEADER_REQUEST_TYPE_BACKWARD = "BACKWARD"
+HEADER_REQUEST_TYPE_CHANGE = "CHANGE"
+HEADER_REQUEST_TYPE_RESET = "RESET"
 
 # Some request header key constants
 HEADER_FIELD_SESSION = "Session"
@@ -27,6 +29,7 @@ class Client:
     INIT = 0
     READY = 1
     PLAYING = 2
+    SWITCH = 3
     state = INIT
     
     SETUP = 0
@@ -35,7 +38,9 @@ class Client:
     TEARDOWN = 3
     FORWARD = 4
     BACKWARD = 5
-    
+    CHANGE = 6
+    RESET = 7
+
     # Initiation.. NOT MODIFIED
     def __init__(self, master, serveraddr, serverport, rtpport, filename):
         self.master = master
@@ -53,6 +58,7 @@ class Client:
         self.connectToServer()
         self.frameNbr = 0
         self.setupMovie()
+        self.isSwitching = 0
         
     def createWidgets(self):
         """Build GUI."""
@@ -61,49 +67,66 @@ class Client:
         # self.setup["text"] = "Setup"
         # self.setup["command"] = self.setupMovie
         # self.setup.grid(row=1, column=0, padx=2, pady=2)
-        menu = Frame(self.master)
-        menu.pack(side=BOTTOM)
+        self.menu = Frame(self.master)
+        self.menu.pack(side=BOTTOM)
         view = Frame(self.master)
         view.pack(side=TOP)
         # Create Play button      
-        self.start = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        playBtn = ImageTk.PhotoImage(Image.open('playbtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.start = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        playBtn = ImageTk.PhotoImage(Image.open('playbtn.png').resize((40, 40), Image.ANTIALIAS))
         self.start.config(image=playBtn)
         self.start.image = playBtn
         self.start["command"] = self.playMovie
         self.start.grid(row=1, column=1, padx=2, pady=2)
         
         # Create Pause button           
-        self.pause = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        pauseBtn = ImageTk.PhotoImage(Image.open('pauseBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.pause = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        pauseBtn = ImageTk.PhotoImage(Image.open('pauseBtn.png').resize((40, 40), Image.ANTIALIAS))
         self.pause.config(image=pauseBtn)
         self.pause["command"] = self.pauseMovie
         self.pause.image = pauseBtn
         self.pause.grid(row=1, column=2, padx=2, pady=2)
         
         # Create Teardown button
-        self.teardown = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        teardownBtn = ImageTk.PhotoImage(Image.open('teardownBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.teardown = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        teardownBtn = ImageTk.PhotoImage(Image.open('teardownBtn.png').resize((40, 40), Image.ANTIALIAS))
         self.teardown.config(image=teardownBtn)
         self.teardown.image = teardownBtn
-        self.teardown["command"] =  self.exitClient
+        self.teardown["command"] =  self.teardownMovie
         self.teardown.grid(row=1, column=3, padx=2, pady=2)
         
-        # Create Forward button
-        self.forward = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        forwardBtn = ImageTk.PhotoImage(Image.open('forwardBtn.png').resize((20, 20), Image.ANTIALIAS))
-        self.forward.config(image=forwardBtn)
-        self.forward.image = forwardBtn
-        self.forward["command"] =  self.forwardMovie
-        self.forward.grid(row=1, column=4, padx=2, pady=2)
 
         # Create Backward button
-        self.backward = Button(menu, width=20, height=20, padx=3, pady=3, bg='white', activebackground='#00FFFF')
-        backwardBtn = ImageTk.PhotoImage(Image.open('backwardBtn.png').resize((20, 20), Image.ANTIALIAS))
+        self.backward = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        backwardBtn = ImageTk.PhotoImage(Image.open('backwardBtn.png').resize((40, 40), Image.ANTIALIAS))
         self.backward.config(image=backwardBtn)
         self.backward.image = backwardBtn
         self.backward["command"] = self.backwardMovie
-        self.backward.grid(row=1, column=5, padx=2, pady=2)
+        self.backward.grid(row=1, column=4, padx=2, pady=2)
+
+        # Create Forward button
+        self.forward = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        forwardBtn = ImageTk.PhotoImage(Image.open('forwardBtn.png').resize((40, 40), Image.ANTIALIAS))
+        self.forward.config(image=forwardBtn)
+        self.forward.image = forwardBtn
+        self.forward["command"] =  self.forwardMovie
+        self.forward.grid(row=1, column=5, padx=2, pady=2)
+
+        # Create Switch button
+        self.switch = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        switchBtn = ImageTk.PhotoImage(Image.open('switchBtn.png').resize((40, 40), Image.ANTIALIAS))
+        self.switch.config(image=switchBtn)
+        self.switch.image = switchBtn
+        self.switch["command"] =  self.switchMovie
+        self.switch.grid(row=1, column=6, padx=2, pady=2)
+
+        # Create Reset button
+        self.reset = Button(self.menu, width=40, height=40, padx=3, pady=3, bg='white', activebackground='#00FFFF')
+        resetBtn = ImageTk.PhotoImage(Image.open('resetBtn.png').resize((40, 40), Image.ANTIALIAS))
+        self.reset.config(image=resetBtn)
+        self.reset.image = resetBtn
+        self.reset["command"] =  self.resetConnect
+        self.reset.grid(row=1, column=7, padx=2, pady=2)
 
         # Create a label to display the movie
         self.label = Label(view)
@@ -116,19 +139,35 @@ class Client:
         """Setup button handler."""
         if self.state == self.INIT:
             self.sendRtspRequest(self.SETUP)
-    
+        
+    def resetConnect(self):
+        if self.state == self.INIT:
+            self.teardownAcked = 0
+            self.rtspSeq = 0
+            self.sessionId = 0
+            self.requestSent = -1
+            self.frameNbr = 0
+            self.isSwitching = 0
+            self.connectToServer()
+            self.setupMovie()
+            self.playMovie()
+
     def exitClient(self):
         """Teardown button handler."""
         self.sendRtspRequest(self.TEARDOWN)     
         self.master.destroy() # Close the gui window
         os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
 
+    def teardownMovie(self):
+        self.sendRtspRequest(self.TEARDOWN)     
+        # self.master.destroy() # Close the gui window
+        os.remove(CACHE_FILE_NAME + str(self.sessionId) + CACHE_FILE_EXT) # Delete the cache image from video
+    
     def pauseMovie(self):
         """Pause button handler."""
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.PAUSE)
     
-    # NOT MODIFY
     def playMovie(self):
         """Play button handler."""
         if self.state == self.READY:
@@ -145,6 +184,9 @@ class Client:
     def backwardMovie(self):
         if self.state == self.PLAYING:
             self.sendRtspRequest(self.BACKWARD)
+
+    def switchMovie(self):
+        self.sendRtspRequest(self.CHANGE)
 
     def listenRtp(self):        
         """Listen for RTP packets."""
@@ -268,6 +310,15 @@ class Client:
             request = self.newRequest(HEADER_REQUEST_TYPE_TEARDOWN)
             # Keep track of the sent request.
             self.requestSent = self.TEARDOWN
+        
+        # Change request
+        elif requestCode == self.CHANGE:
+            # Update RTSP sequence number.
+            self.rtspSeq += 1
+            # Write the RTSP request to be sent.
+            request = self.newRequest(HEADER_REQUEST_TYPE_CHANGE)
+            # Keep track of the sent request.
+            self.requestSent = self.CHANGE
         else:
             return
         
@@ -284,13 +335,14 @@ class Client:
             
             if reply: 
                 self.parseRtspReply(reply.decode("utf-8"))
-            
+                
             # Close the RTSP socket upon requesting Teardown
             if self.requestSent == self.TEARDOWN:
                 self.rtspSocket.shutdown(socket.SHUT_RDWR)
                 self.rtspSocket.close()
                 break
-
+            
+                
     def parseRtspReply(self, data):
         """Parse the RTSP reply from the server."""
         lines = data.split('\n')
@@ -302,7 +354,7 @@ class Client:
             # New RTSP session ID
             if self.sessionId == 0:
                 self.sessionId = session
-            
+
             # Process only if the session ID is the same
             if self.sessionId == session:
                 if int(lines[0].split(' ')[1]) == 200: 
@@ -316,12 +368,29 @@ class Client:
                         self.state = self.PLAYING
                     elif self.requestSent == self.PAUSE:
                         self.state = self.READY
-
                         # The play thread exits. A new thread is created on resume.
                         self.playEvent.set()
+                    elif self.requestSent == self.CHANGE:
+                        self.state = self.SWITCH
+                        # print(lines)
+                        listfile = lines[3].split(' ')
+                        listfile.pop()
+                        for x in listfile:
+                            if x == self.fileName:
+                                idx = listfile.index(x)
+                                if (idx != (len(listfile) - 1)):
+                                    self.fileName = listfile[idx + 1]
+                                else:
+                                    self.fileName = listfile[0]
+                                break
+                        # create a drop down 
+                        # variable = StringVar()
+                        # w = OptionMenu(self.master, variable, *self.listfile[:-1])
+                        # w.pack(side=TOP)
+                        # w["command"] = self.changeMovie
+
                     elif self.requestSent == self.TEARDOWN:
                         self.state = self.INIT
-
                         # Flag the teardownAcked to close the socket.
                         self.teardownAcked = 1
 
